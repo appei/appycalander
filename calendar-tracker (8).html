@@ -1,0 +1,3109 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Calendar Tracker</title>
+
+<style>
+/* ---------- VARIABLES ---------- */
+:root {
+  --body-bg-color: #F9F4E6;
+  --body-bg-image: url("icons/pastelfield.png");
+  --shell-bg-image: url("Journal.png");
+  --shell-radius: 22px;
+  --btn-bg: #F5D9B8;
+  --btn-bg-hover: #FCE5CC;
+  --btn-border: #C69C7C;
+  --btn-text: #7B5942;
+  --text-main: #4e3728;
+  --title-color: #4e3728;
+  --modal-bg: #FFF9F0;
+  --modal-header-bg: #F5D9B8;
+  --scrollbar-color: #D1AD90;
+  --glow-color: #ff78be;
+  --calendar-bg: #FFF3E2;
+  --calendar-header: #F5D9B8;
+  --calendar-border: #D1AD90;
+  --calendar-today: #FFE5CC;
+  --calendar-day-outline: #D1AD90;
+  --header-line-color: #D1AD90;
+  --font-scale: 1;
+  --menu-font-scale: 1;
+  --calendar-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+@font-face {
+  font-family: 'NDS-BIOS';
+  src:
+    local('Nintendo DS BIOS'),
+    local('NINTENDO-DS-BIOS'),
+    url('NINTENDO-DS-BIOS.TTF') format('truetype');
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--body-bg-color);
+  background-image: var(--body-bg-image);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+  font-family: 'NDS-BIOS', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text-main);
+  font-size: calc(24px * var(--font-scale));
+}
+
+body.bg-tiled {
+  background-repeat: repeat;
+  background-size: auto;
+}
+
+body.no-select {
+  user-select: none;
+}
+
+/* Side menu toggle button */
+#sideMenuToggle {
+  position: fixed;
+  z-index: 80;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.3s ease;
+}
+
+#sideMenuToggle:hover {
+  background: var(--btn-bg-hover);
+}
+
+#sideMenuToggle.open {
+  transform: rotate(90deg);
+}
+
+/* Side menu container */
+#sideMenuContainer {
+  position: fixed;
+  z-index: 70;
+  top: 60px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+
+#sideMenuContainer.open {
+  max-height: 400px;
+  opacity: 1;
+}
+
+/* floating buttons */
+#themeButton,
+#decorModeButton,
+#openEmoteBookGlobal,
+#downloadJsonBtn,
+#importJsonBtn,
+#fsSetupBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+#themeButton:hover,
+#decorModeButton:hover,
+#openEmoteBookGlobal:hover,
+#downloadJsonBtn:hover,
+#importJsonBtn:hover,
+#fsSetupBtn:hover {
+  background: var(--btn-bg-hover);
+}
+
+body.decor-mode::after {
+  content: "Decorate mode: drop images to add stickers, drag corners to rotate (saved per month)";
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #7b5942;
+  font-size: 14px;
+  z-index: 55;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+}
+
+/* ---------- DECORATION LAYER ---------- */
+#decorLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+body.decor-mode #decorLayer {
+  pointer-events: auto;
+}
+
+.sticker {
+  position: absolute;
+  cursor: grab;
+}
+
+.sticker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.sticker-handle,
+.sticker-delete,
+.sticker-rotate {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+body.decor-mode .sticker-handle,
+body.decor-mode .sticker-delete,
+body.decor-mode .sticker-rotate {
+  opacity: 1;
+}
+
+.sticker-handle {
+  bottom: -6px;
+  right: -6px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  cursor: se-resize;
+}
+
+.sticker-rotate {
+  bottom: -6px;
+  left: -6px;
+  border: 1px solid #7b9bc6;
+  background: #b8d4f5;
+  cursor: grab;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  color: #3a5a8c;
+}
+
+.sticker-delete {
+  top: -6px;
+  right: -6px;
+  border: 1px solid #c0576a;
+  background: #ffb7c5;
+  color: #5b1827;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* ---------- MAIN SHELL ---------- */
+#ideaPadShell {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1255px;
+  max-width: 95vw;
+  height: 780px;
+  max-height: 90vh;
+  background-image: var(--shell-bg-image);
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--shell-radius);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.35);
+  padding: 15px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* CALENDAR */
+#calendarContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 30px 30px 30px 30px;
+  background: var(--calendar-bg);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--calendar-shadow);
+}
+
+#calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--header-line-color);
+}
+
+#calendarTitle {
+  font-size: 1.3em;
+  font-weight: bold;
+  color: var(--title-color);
+}
+
+#calendarNav {
+  display: flex;
+  gap: 8px;
+}
+
+#calendarNav button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: 0.7em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#calendarNav button:hover {
+  background: var(--btn-bg-hover);
+}
+
+#calendarNav button.drag-hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 12px rgba(255, 120, 190, 0.6);
+  background: var(--btn-bg-hover);
+}
+
+#calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  flex: 1;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.7em;
+  padding: 8px 4px;
+  color: var(--title-color);
+  background: var(--calendar-header);
+  border-radius: 8px;
+}
+
+.calendar-day {
+  min-height: 90px;
+  border: 1px solid var(--calendar-day-outline);
+  border-radius: 8px;
+  padding: 6px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.calendar-day.today {
+  background: var(--calendar-today);
+  border: 2px solid var(--btn-border);
+}
+
+.calendar-day.other-month {
+  opacity: 0.4;
+}
+
+.calendar-day.drag-over {
+  background: #ffe0f0;
+  border: 2px dashed var(--glow-color);
+  transform: scale(1.02);
+}
+
+.calendar-day-number {
+  font-weight: bold;
+  font-size: 0.7em;
+  margin-bottom: 4px;
+  color: var(--title-color);
+}
+
+.calendar-day-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.calendar-calories {
+  font-size: 0.6em;
+  color: var(--title-color);
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.calendar-day:hover .calendar-calories {
+  opacity: 1;
+}
+
+.calendar-calories.has-calories {
+  opacity: 1;
+}
+
+.calendar-day-entries {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.5em;
+}
+
+.calendar-entry-preview {
+  background: var(--btn-bg);
+  padding: 3px 6px;
+  margin: 2px 0;
+  border-radius: 6px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.calendar-entry-preview:hover {
+  background: var(--btn-bg-hover);
+}
+
+.calendar-entry-preview.dragging {
+  opacity: 0.5;
+}
+
+.calendar-entry-preview.completed {
+  opacity: 0.6;
+  text-decoration: line-through;
+  background: #e8e0d5;
+}
+
+.calendar-entry-preview.completed::before {
+  content: "✓";
+  margin-right: 2px;
+  color: #2d5a27;
+}
+
+.calendar-entry-preview img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+#storageWarning,
+#fileSaveStatus {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  font-size: 0.5em;
+  color: #6b4b2f;
+  background: rgba(255, 249, 240, 0.95);
+  padding: 6px 12px;
+  border-radius: 8px;
+  z-index: 70;
+  max-width: 300px;
+}
+
+#storageWarning {
+  color: #b33b3b;
+}
+
+.hidden {
+  display: none;
+}
+
+/* ---------- MODALS ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 0.18s ease;
+}
+
+.modal-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#themeModalBackdrop {
+  background: transparent;
+}
+
+#themeModalBackdrop.visible {
+  background: transparent;
+}
+
+#emoteModalBackdrop {
+  inset: initial;
+  width: auto;
+  height: auto;
+  background: transparent;
+}
+
+#emoteModalBackdrop.visible {
+  background: transparent;
+}
+
+#emoteModal {
+  z-index: 130;
+}
+
+.modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  min-width: 320px;
+  max-width: 800px;
+  background: var(--modal-bg);
+  border-radius: 18px;
+  border: 2px solid #D1AD90;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  padding: 0;
+  overflow: hidden;
+  transform: translate(-50%, -50%) scale(0.96);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.modal.open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.modal.closing {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+}
+
+.modal.dragging {
+  transition: none !important;
+}
+
+.modal.small {
+  max-width: 460px;
+}
+
+#imagePreviewModal.modal.small {
+  max-width: 820px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--modal-header-bg);
+  border-bottom: 1px solid #C69C7C;
+  cursor: move;
+}
+
+.modal-title {
+  font-size: calc(0.9em * var(--menu-font-scale));
+  color: var(--title-color);
+}
+
+.modal-close {
+  border: none;
+  background: none;
+  font-size: calc(20px * var(--menu-font-scale));
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 10px 14px 12px;
+  max-height: 70vh;
+  overflow-y: auto;
+  font-size: calc(0.75em * var(--menu-font-scale));
+}
+
+.modal-row {
+  margin-bottom: 10px;
+}
+
+.modal-label {
+  display: block;
+  font-size: 0.8em;
+  margin-bottom: 2px;
+  color: #8D6C57;
+}
+
+.modal-input,
+.modal-textarea {
+  width: 100%;
+  font-family: 'NDS-BIOS', system-ui, sans-serif;
+  font-size: 1em;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid #D1AD90;
+  background: #FFF3E2;
+  color: var(--text-main);
+}
+
+.modal-textarea {
+  min-height: 220px;
+  resize: vertical;
+}
+
+.btn-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: calc(0.7em * var(--menu-font-scale));
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-pill:hover {
+  background: var(--btn-bg-hover);
+}
+
+.btn-pill.active {
+  background: #a8d8a0;
+  border-color: #6b9b63;
+}
+
+#entryBodyEditor {
+  width: 100%;
+  min-height: 260px;
+  border-radius: 10px;
+  border: 1px solid #D1AD90;
+  background: #FFF3E2;
+  padding: 8px;
+  font-size: 1em;
+  line-height: 1.5;
+  overflow-y: auto;
+  color: #4e3728;
+  caret-color: #4e3728;
+}
+
+#entryBodyEditor:focus {
+  outline: 2px solid #D1AD90;
+}
+
+#entryBodyEditor img {
+  max-width: 100%;
+  height: auto;
+  cursor: pointer;
+}
+
+#entryHtmlTextarea {
+  color: #4e3728;
+  caret-color: #4e3728;
+}
+
+#entryToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+#entryToolbar button {
+  min-width: 32px;
+}
+
+#entryBodyEditor img.emote-selected {
+  outline: 3px dashed #ff7bb0;
+  outline-offset: 2px;
+}
+
+#entryHtmlTextarea {
+  margin-top: 6px;
+}
+
+.inline-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.85em;
+}
+
+.modal-footer {
+  padding: 8px 14px 10px;
+  border-top: 1px solid #D1AD90;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-footer button {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: calc(0.75em * var(--menu-font-scale));
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.modal-footer button:hover {
+  background: var(--btn-bg-hover);
+}
+
+#entryDropZone {
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px dashed var(--btn-border);
+  background: #FFF9ED;
+  font-size: 0.85em;
+  text-align: center;
+}
+
+/* EMOTE BOOK */
+#emoteGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.emote-tile {
+  position: relative;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #D1AD90;
+  background: #FFF3E2;
+  cursor: pointer;
+}
+
+.emote-tile img {
+  display: block;
+  width: 100%;
+  height: 48px;
+  object-fit: contain;
+}
+
+.emote-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #c0576a;
+  background: #ffb7c5;
+  color: #5b1827;
+  font-size: 12px;
+  line-height: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+#emotePager {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85em;
+}
+
+.helper-text {
+  font-size: 0.85em;
+  color: #8D6C57;
+}
+
+/* text effects */
+.fx-rainbow {
+  background-image: linear-gradient(
+    90deg,
+    #ff4b6e,
+    #ff7a00,
+    #ffd93d,
+    #3ddc84,
+    #4b7bff,
+    #b15cff,
+    #ff4b6e
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: rainbowShift 3s linear infinite;
+}
+
+@keyframes rainbowShift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.fx-glow {
+  color: #ffffff;
+  text-shadow:
+    0 0 3px rgba(255,255,255,0.9),
+    0 0 8px var(--glow-color),
+    0 0 16px var(--glow-color),
+    0 0 24px var(--glow-color);
+  animation: glowPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%,100% {
+    text-shadow:
+      0 0 3px rgba(255,255,255,0.9),
+      0 0 8px var(--glow-color),
+      0 0 16px var(--glow-color),
+      0 0 24px var(--glow-color);
+  }
+  50% {
+    text-shadow:
+      0 0 5px rgba(255,255,255,1),
+      0 0 12px var(--glow-color),
+      0 0 22px var(--glow-color),
+      0 0 30px var(--glow-color);
+  }
+}
+
+.fx-wave {
+  display: inline-block;
+  animation: waveBounce 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes waveBounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-0.35em); }
+}
+
+#imagePreviewImg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Entry view modal */
+#entryViewBody {
+  font-size: 1em;
+  line-height: 1.6;
+}
+
+#entryViewBody img {
+  max-width: 100%;
+  height: auto;
+  cursor: zoom-in;
+}
+
+/* Drag ghost */
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  padding: 4px 10px;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--btn-text);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0.9;
+}
+
+/* YouTube iframe (hidden) */
+/* YouTube embed in side menu */
+#youtubeEmbedContainer {
+  width: 120px;
+  height: 68px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--btn-border);
+}
+
+#youtubeEmbedContainer:empty {
+  display: none;
+}
+
+#youtubeEmbedContainer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Theme presets dropdown */
+.theme-preset-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.theme-preset-row select {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid #D1AD90;
+  background: #FFF3E2;
+  font-family: inherit;
+  font-size: 0.9em;
+  color: var(--text-main);
+}
+
+/* Toggle switch */
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-switch input[type="checkbox"] {
+  width: 40px;
+  height: 22px;
+  appearance: none;
+  background: #ccc;
+  border-radius: 11px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.toggle-switch input[type="checkbox"]:checked {
+  background: #a8d8a0;
+}
+
+.toggle-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch input[type="checkbox"]:checked::before {
+  transform: translateX(18px);
+}
+</style>
+</head>
+<body>
+
+<!-- SIDE MENU TOGGLE -->
+<button id="sideMenuToggle" title="Toggle menu">☰</button>
+
+<!-- SIDE MENU CONTAINER -->
+<div id="sideMenuContainer">
+  <button id="themeButton" title="Customize theme">🔧</button>
+  <button id="decorModeButton" title="Toggle decorate mode">🎀</button>
+  <button id="openEmoteBookGlobal" title="Open emote sticker book">😊</button>
+  <button id="downloadJsonBtn" title="Download JSON backup">💾</button>
+  <button id="importJsonBtn" title="Import JSON backup">📂</button>
+  <button id="fsSetupBtn" title="Set up autosave file">📝</button>
+  <div id="youtubeEmbedContainer"></div>
+</div>
+
+<!-- DECORATION LAYER -->
+<div id="decorLayer"></div>
+
+<!-- MAIN SHELL -->
+<div id="ideaPadShell">
+  <!-- CALENDAR -->
+  <div id="calendarContainer">
+    <div id="calendarHeader">
+      <div id="calendarTitle"></div>
+      <div id="calendarNav">
+        <button id="prevMonthBtn">◀ prev</button>
+        <button id="todayBtn">today</button>
+        <button id="nextMonthBtn">next ▶</button>
+      </div>
+    </div>
+    <div id="calendarGrid"></div>
+  </div>
+</div>
+
+<div id="storageWarning"></div>
+<div id="fileSaveStatus"></div>
+
+<!-- hidden file input -->
+<input type="file" id="importJsonInput" accept="application/json" class="hidden">
+
+<!-- -------- ENTRY MODAL -------- -->
+<div id="entryModalBackdrop" class="modal-backdrop">
+  <div id="entryModal" class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="entryModalTitle">New entry</span>
+      <button class="modal-close" data-close-entry>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-row">
+        <label class="modal-label" for="entryTitleInput">Entry title (will appear in calendar)</label>
+        <input id="entryTitleInput" class="modal-input" type="text" placeholder="e.g., Doctor appointment">
+      </div>
+
+      <div class="modal-row">
+        <div class="modal-label">Insert image into entry</div>
+        <div class="inline-row">
+          <input id="imageUrlInput" class="modal-input" type="text" placeholder="https://example.com/myimage.png">
+          <button type="button" class="btn-pill" id="insertImageScaledBtn">300px</button>
+          <button type="button" class="btn-pill" id="insertImageOriginalBtn">orig</button>
+        </div>
+        <div id="entryDropZone" style="margin-top:6px;">
+          drag & drop image files here to embed them
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <div class="inline-row">
+          <button type="button" class="btn-pill" id="saveSelectedAsEmotesBtn">
+            save selected images as emotes
+          </button>
+          <button type="button" class="btn-pill" id="openEmoteBookFromEntryBtn">
+            open emote sticker book
+          </button>
+        </div>
+        <div class="helper-text" style="margin-top:4px;">
+          Tip: click images in the text below to highlight them pink before saving as emotes.
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <div class="inline-row">
+          <label style="display:flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="entryHtmlModeToggle">
+            HTML mode
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label">Entry text</label>
+        <div id="entryToolbar">
+          <button type="button" class="btn-pill" data-cmd="bold"><b>B</b></button>
+          <button type="button" class="btn-pill" data-cmd="italic"><i>I</i></button>
+          <button type="button" class="btn-pill" data-cmd="underline"><u>U</u></button>
+          <button type="button" class="btn-pill" data-align="left">⟸</button>
+          <button type="button" class="btn-pill" data-align="center">⟺</button>
+          <button type="button" class="btn-pill" data-align="right">⟹</button>
+          <button type="button" class="btn-pill" data-effect="rainbow">🌈</button>
+          <button type="button" class="btn-pill" data-effect="glow">✨</button>
+          <button type="button" class="btn-pill" data-effect="wave">〰️</button>
+        </div>
+        <div id="entryBodyEditor" contenteditable="true"></div>
+        <textarea id="entryHtmlTextarea" class="modal-textarea hidden"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="saveEntryBtn">save entry</button>
+      <button type="button" id="deleteEntryBtn" class="hidden">delete entry</button>
+      <button type="button" data-close-entry>cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- ENTRY VIEW MODAL -------- -->
+<div id="entryViewBackdrop" class="modal-backdrop">
+  <div id="entryViewModal" class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="entryViewTitle"></span>
+      <button class="modal-close" data-close-view>✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="entryViewDate" style="font-size:0.85em;color:#8D6C57;margin-bottom:8px;"></div>
+      <div id="entryViewBody"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="toggleCompleteBtn">mark completed</button>
+      <button type="button" id="editEntryFromViewBtn">edit</button>
+      <button type="button" data-close-view>close</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- THEME MODAL -------- -->
+<div id="themeModalBackdrop" class="modal-backdrop">
+  <div id="themeModal" class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Customize theme</span>
+      <button class="modal-close" data-close-theme>✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Theme Presets -->
+      <div class="modal-row">
+        <label class="modal-label">Theme Presets</label>
+        <div class="theme-preset-row">
+          <select id="themePresetSelect">
+            <option value="">-- Select a saved theme --</option>
+          </select>
+          <button type="button" class="btn-pill" id="loadThemePresetBtn">Load</button>
+          <button type="button" class="btn-pill" id="deleteThemePresetBtn">Delete</button>
+        </div>
+        <div class="inline-row" style="margin-top:6px;">
+          <input type="text" id="themePresetNameInput" class="modal-input" placeholder="New theme name" style="max-width: 200px;">
+          <button type="button" class="btn-pill" id="saveThemePresetBtn">Save as Preset</button>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="bodyBgColorInput">Website background color</label>
+        <input type="color" id="bodyBgColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="bodyBgImageInput">Website background image URL</label>
+        <input type="text" id="bodyBgImageInput" class="modal-input" placeholder="icons/pastelfield.png">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label">Background image mode</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="bgTiledToggle">
+          <span>Tile background (repeat pattern)</span>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="shellBgImageInput">Inner background image URL</label>
+        <input type="text" id="shellBgImageInput" class="modal-input" placeholder="Journal.png">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="shellRadiusInput">Corner roundness (px)</label>
+        <input type="number" id="shellRadiusInput" class="modal-input" min="0" max="80" step="2">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="btnColorInput">Button color</label>
+        <input type="color" id="btnColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="btnTextColorInput">Button text color</label>
+        <input type="color" id="btnTextColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="textColorInput">Main text color</label>
+        <input type="color" id="textColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="titleColorInput">Title color</label>
+        <input type="color" id="titleColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="headerLineColorInput">Header line color (above calendar)</label>
+        <input type="color" id="headerLineColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="calendarBgInput">Calendar background color</label>
+        <input type="color" id="calendarBgInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="calendarHeaderInput">Calendar header color</label>
+        <input type="color" id="calendarHeaderInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="calendarTodayInput">Calendar today highlight color</label>
+        <input type="color" id="calendarTodayInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="dayOutlineColorInput">Day square outline color</label>
+        <input type="color" id="dayOutlineColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label">Calendar shadow</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="calendarShadowToggle" checked>
+          <span>Show outer shadow</span>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="glowColorInput">Glow text color (✨)</label>
+        <input type="color" id="glowColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="modalBgColorInput">Popup window color</label>
+        <input type="color" id="modalBgColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="modalHeaderColorInput">Popup title bar color</label>
+        <input type="color" id="modalHeaderColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="scrollbarColorInput">Scrollbar color</label>
+        <input type="color" id="scrollbarColorInput" class="modal-input">
+      </div>
+
+      <div class="modal-row">
+        <span class="modal-label">Calendar font size</span>
+        <div class="inline-row">
+          <button type="button" class="btn-pill" id="fontSizeMinusBtn">A−</button>
+          <button type="button" class="btn-pill" id="fontSizePlusBtn">A+</button>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <span class="modal-label">Menu/popup text size</span>
+        <div class="inline-row">
+          <button type="button" class="btn-pill" id="menuFontSizeMinusBtn">A−</button>
+          <button type="button" class="btn-pill" id="menuFontSizePlusBtn">A+</button>
+          <span id="menuFontSizeDisplay" style="font-size:0.8em; color:#8D6C57;">100%</span>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label" for="youtubeUrlInput">Background music (YouTube URL)</label>
+        <input type="text" id="youtubeUrlInput" class="modal-input" placeholder="https://www.youtube.com/watch?v=...">
+        <div class="helper-text" style="margin-top:4px;">
+          Paste a YouTube video URL. A small player will appear in the menu (☰) where you can play/pause.
+        </div>
+      </div>
+
+      <div class="modal-row helper-text">
+        Decorations: turn on 🎀 decorate mode, then drag & drop images anywhere on the screen.
+        Use the rotate handle (↻) on the bottom-left corner to rotate stickers.
+        <br><br>
+        <strong>Note:</strong> Decorations are saved per-month! Each month can have its own unique stickers.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="saveThemeBtn">save look</button>
+      <button type="button" data-close-theme>close</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- EMOTE STICKER BOOK -------- -->
+<div id="emoteModalBackdrop" class="modal-backdrop">
+  <div id="emoteModal" class="modal small">
+    <div class="modal-header">
+      <span class="modal-title">Emote sticker book</span>
+      <button class="modal-close" data-close-emote>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="helper-text">
+        Click an emote to insert it into your current entry. Small previews, 20 per page.
+      </div>
+      <div id="emoteGrid" style="margin-top:8px;"></div>
+      <div id="emotePager">
+        <button type="button" class="btn-pill" id="emotePrevBtn">◀ prev</button>
+        <span id="emotePageInfo">page 1/1</span>
+        <button type="button" class="btn-pill" id="emoteNextBtn">next ▶</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" data-close-emote>close</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- IMAGE PREVIEW MODAL -------- -->
+<div id="imagePreviewBackdrop" class="modal-backdrop">
+  <div id="imagePreviewModal" class="modal small">
+    <div class="modal-header">
+      <span class="modal-title">Image view</span>
+      <button class="modal-close" data-close-image>✕</button>
+    </div>
+    <div class="modal-body">
+      <img id="imagePreviewImg" alt="preview">
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="imagePrevBtn">◀ prev</button>
+      <button type="button" id="imageNextBtn">next ▶</button>
+      <button type="button" data-close-image>close</button>
+    </div>
+  </div>
+</div>
+
+<!-- -------- CALORIE TRACKER MODAL -------- -->
+<div id="calorieModalBackdrop" class="modal-backdrop">
+  <div id="calorieModal" class="modal small">
+    <div class="modal-header">
+      <span class="modal-title">Calorie Tracker</span>
+      <button class="modal-close" data-close-calorie>✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align: center; margin-bottom: 12px;">
+        <div style="font-size: 1.4em; font-weight: bold; color: var(--title-color);" id="calorieTotal">0 cal</div>
+        <div style="font-size: 0.85em; color: #8D6C57;" id="calorieDate"></div>
+      </div>
+      
+      <div class="modal-row">
+        <label class="modal-label">Add/Remove Calories</label>
+        <div class="inline-row">
+          <input type="number" id="calorieAmountInput" class="modal-input" placeholder="100" style="max-width: 120px;">
+          <button type="button" class="btn-pill" id="addCaloriesBtn">+ add</button>
+          <button type="button" class="btn-pill" id="subtractCaloriesBtn">− remove</button>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label">Quick Add</label>
+        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+          <button type="button" class="btn-pill" data-quick-cal="10">+10</button>
+          <button type="button" class="btn-pill" data-quick-cal="20">+20</button>
+          <button type="button" class="btn-pill" data-quick-cal="50">+50</button>
+          <button type="button" class="btn-pill" data-quick-cal="100">+100</button>
+          <button type="button" class="btn-pill" data-quick-cal="200">+200</button>
+          <button type="button" class="btn-pill" data-quick-cal="500">+500</button>
+        </div>
+      </div>
+
+      <div class="modal-row">
+        <label class="modal-label">Set Total</label>
+        <div class="inline-row">
+          <input type="number" id="calorieSetInput" class="modal-input" placeholder="1500" style="max-width: 120px;">
+          <button type="button" class="btn-pill" id="setCaloriesBtn">set</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="resetCaloriesBtn">reset to 0</button>
+      <button type="button" data-close-calorie>close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "calendarTracker.v1";
+
+const defaultState = {
+  entries: [],
+  calories: {},
+  theme: {
+    bodyBgColor: "#F9F4E6",
+    bodyBgImage: "icons/pastelfield.png",
+    bgTiled: false,
+    shellBgImage: "Journal.png",
+    shellRadius: 22,
+    btnColor: "#F5D9B8",
+    btnTextColor: "#7B5942",
+    textColor: "#4e3728",
+    titleColor: "#4e3728",
+    headerLineColor: "#D1AD90",
+    fontScale: 1,
+    menuFontScale: 1,
+    modalBgColor: "#FFF9F0",
+    modalHeaderColor: "#F5D9B8",
+    scrollbarColor: "#D1AD90",
+    glowColor: "#ff78be",
+    calendarBg: "#FFF3E2",
+    calendarHeader: "#F5D9B8",
+    calendarToday: "#FFE5CC",
+    dayOutlineColor: "#D1AD90",
+    calendarShadow: true,
+    youtubeUrl: ""
+  },
+  decorations: [],
+  monthDecorations: {},
+  emotes: [],
+  themePresets: {}
+};
+
+let state = null;
+let currentEditingId = null;
+let currentEditor = null;
+let storageBroken = false;
+
+const EMOTES_PER_PAGE = 20;
+let emotePageIndex = 0;
+
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+let selectedDate = null;
+let selectedCalorieDate = null;
+let currentViewingEntryId = null;
+
+let currentPreviewImages = [];
+let currentPreviewIndex = 0;
+
+// Drag and drop state
+let draggedEntryId = null;
+let dragGhost = null;
+let dragHoverInterval = null;
+let dragHoverStartTime = null;
+let currentHoverButton = null;
+
+/* ---------- ELEMENTS ---------- */
+const calendarContainer = document.getElementById("calendarContainer");
+const calendarTitle = document.getElementById("calendarTitle");
+const calendarGrid = document.getElementById("calendarGrid");
+const prevMonthBtn = document.getElementById("prevMonthBtn");
+const nextMonthBtn = document.getElementById("nextMonthBtn");
+const todayBtn = document.getElementById("todayBtn");
+
+const storageWarning = document.getElementById("storageWarning");
+const fileSaveStatus = document.getElementById("fileSaveStatus");
+
+const downloadJsonBtn = document.getElementById("downloadJsonBtn");
+const importJsonBtn = document.getElementById("importJsonBtn");
+const importJsonInput = document.getElementById("importJsonInput");
+
+const sideMenuToggle = document.getElementById("sideMenuToggle");
+const sideMenuContainer = document.getElementById("sideMenuContainer");
+const themeButton = document.getElementById("themeButton");
+const decorModeButton = document.getElementById("decorModeButton");
+const openEmoteBookGlobal = document.getElementById("openEmoteBookGlobal");
+const decorLayer = document.getElementById("decorLayer");
+const fsSetupBtn = document.getElementById("fsSetupBtn");
+const youtubeEmbedContainer = document.getElementById("youtubeEmbedContainer");
+
+const entryModalBackdrop = document.getElementById("entryModalBackdrop");
+const entryModal = document.getElementById("entryModal");
+const entryModalTitle = document.getElementById("entryModalTitle");
+const entryTitleInput = document.getElementById("entryTitleInput");
+const imageUrlInput = document.getElementById("imageUrlInput");
+const insertImageScaledBtn = document.getElementById("insertImageScaledBtn");
+const insertImageOriginalBtn = document.getElementById("insertImageOriginalBtn");
+const entryDropZone = document.getElementById("entryDropZone");
+const entryBodyEditor = document.getElementById("entryBodyEditor");
+const entryHtmlModeToggle = document.getElementById("entryHtmlModeToggle");
+const entryHtmlTextarea = document.getElementById("entryHtmlTextarea");
+const saveEntryBtn = document.getElementById("saveEntryBtn");
+const deleteEntryBtn = document.getElementById("deleteEntryBtn");
+const saveSelectedAsEmotesBtn = document.getElementById("saveSelectedAsEmotesBtn");
+const openEmoteBookFromEntryBtn = document.getElementById("openEmoteBookFromEntryBtn");
+const entryToolbar = document.getElementById("entryToolbar");
+
+const entryViewBackdrop = document.getElementById("entryViewBackdrop");
+const entryViewModal = document.getElementById("entryViewModal");
+const entryViewTitle = document.getElementById("entryViewTitle");
+const entryViewDate = document.getElementById("entryViewDate");
+const entryViewBody = document.getElementById("entryViewBody");
+const toggleCompleteBtn = document.getElementById("toggleCompleteBtn");
+const editEntryFromViewBtn = document.getElementById("editEntryFromViewBtn");
+
+const themeModalBackdrop = document.getElementById("themeModalBackdrop");
+const themeModal = document.getElementById("themeModal");
+const bodyBgColorInput = document.getElementById("bodyBgColorInput");
+const bodyBgImageInput = document.getElementById("bodyBgImageInput");
+const bgTiledToggle = document.getElementById("bgTiledToggle");
+const shellBgImageInput = document.getElementById("shellBgImageInput");
+const shellRadiusInput = document.getElementById("shellRadiusInput");
+const btnColorInput = document.getElementById("btnColorInput");
+const btnTextColorInput = document.getElementById("btnTextColorInput");
+const textColorInput = document.getElementById("textColorInput");
+const titleColorInput = document.getElementById("titleColorInput");
+const headerLineColorInput = document.getElementById("headerLineColorInput");
+const calendarBgInput = document.getElementById("calendarBgInput");
+const calendarHeaderInput = document.getElementById("calendarHeaderInput");
+const calendarTodayInput = document.getElementById("calendarTodayInput");
+const dayOutlineColorInput = document.getElementById("dayOutlineColorInput");
+const calendarShadowToggle = document.getElementById("calendarShadowToggle");
+const glowColorInput = document.getElementById("glowColorInput");
+const modalBgColorInput = document.getElementById("modalBgColorInput");
+const modalHeaderColorInput = document.getElementById("modalHeaderColorInput");
+const scrollbarColorInput = document.getElementById("scrollbarColorInput");
+const saveThemeBtn = document.getElementById("saveThemeBtn");
+const fontSizeMinusBtn = document.getElementById("fontSizeMinusBtn");
+const fontSizePlusBtn = document.getElementById("fontSizePlusBtn");
+const menuFontSizeMinusBtn = document.getElementById("menuFontSizeMinusBtn");
+const menuFontSizePlusBtn = document.getElementById("menuFontSizePlusBtn");
+const menuFontSizeDisplay = document.getElementById("menuFontSizeDisplay");
+const youtubeUrlInput = document.getElementById("youtubeUrlInput");
+
+const themePresetSelect = document.getElementById("themePresetSelect");
+const themePresetNameInput = document.getElementById("themePresetNameInput");
+const saveThemePresetBtn = document.getElementById("saveThemePresetBtn");
+const loadThemePresetBtn = document.getElementById("loadThemePresetBtn");
+const deleteThemePresetBtn = document.getElementById("deleteThemePresetBtn");
+
+const emoteModalBackdrop = document.getElementById("emoteModalBackdrop");
+const emoteModal = document.getElementById("emoteModal");
+const emoteGrid = document.getElementById("emoteGrid");
+const emotePrevBtn = document.getElementById("emotePrevBtn");
+const emoteNextBtn = document.getElementById("emoteNextBtn");
+const emotePageInfo = document.getElementById("emotePageInfo");
+
+const imagePreviewBackdrop = document.getElementById("imagePreviewBackdrop");
+const imagePreviewModal = document.getElementById("imagePreviewModal");
+const imagePreviewImg = document.getElementById("imagePreviewImg");
+const imagePrevBtn = document.getElementById("imagePrevBtn");
+const imageNextBtn = document.getElementById("imageNextBtn");
+
+const calorieModalBackdrop = document.getElementById("calorieModalBackdrop");
+const calorieModal = document.getElementById("calorieModal");
+const calorieTotal = document.getElementById("calorieTotal");
+const calorieDate = document.getElementById("calorieDate");
+const calorieAmountInput = document.getElementById("calorieAmountInput");
+const addCaloriesBtn = document.getElementById("addCaloriesBtn");
+const subtractCaloriesBtn = document.getElementById("subtractCaloriesBtn");
+const calorieSetInput = document.getElementById("calorieSetInput");
+const setCaloriesBtn = document.getElementById("setCaloriesBtn");
+const resetCaloriesBtn = document.getElementById("resetCaloriesBtn");
+
+/* ---------- UTILS ---------- */
+function generateId() {
+  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+}
+
+function formatDate(year, month, day) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseDate(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return { year, month: month - 1, day };
+}
+
+function getMonthKey(year, month) {
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+function extractYouTubeId(url) {
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(defaultState);
+    const parsed = JSON.parse(raw);
+
+    const finalState = structuredClone(defaultState);
+    if (parsed.entries && Array.isArray(parsed.entries)) {
+      finalState.entries = parsed.entries;
+    }
+    if (parsed.calories && typeof parsed.calories === "object") {
+      finalState.calories = parsed.calories;
+    }
+    if (parsed.theme && typeof parsed.theme === "object") {
+      Object.assign(finalState.theme, parsed.theme);
+    }
+    if (parsed.decorations && Array.isArray(parsed.decorations)) {
+      finalState.decorations = parsed.decorations;
+    }
+    if (parsed.monthDecorations && typeof parsed.monthDecorations === "object") {
+      finalState.monthDecorations = parsed.monthDecorations;
+    }
+    if (parsed.emotes && Array.isArray(parsed.emotes)) {
+      finalState.emotes = parsed.emotes;
+    }
+    if (parsed.themePresets && typeof parsed.themePresets === "object") {
+      finalState.themePresets = parsed.themePresets;
+    }
+    return finalState;
+  } catch (err) {
+    console.warn("Failed to load state:", err);
+    return structuredClone(defaultState);
+  }
+}
+
+/* File System Access API autosave */
+let fileHandle = null;
+let fileAutosaveTimer = null;
+
+async function chooseAutosaveFile() {
+  if (!window.showSaveFilePicker) {
+    alert("This browser does not support the File System Access API. Try Chrome or Edge.");
+    return;
+  }
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: "calendar-tracker.json",
+      types: [{
+        description: "JSON Files",
+        accept: { "application/json": [".json"] }
+      }]
+    });
+    fileSaveStatus.textContent = "Autosaving to: " + (fileHandle.name || "calendar-tracker.json");
+    scheduleFileAutosave();
+  } catch (err) {
+    console.error("File picker cancelled or failed", err);
+  }
+}
+
+async function saveStateToFile() {
+  if (!fileHandle) return;
+  try {
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(state, null, 2));
+    await writable.close();
+    const now = new Date();
+    fileSaveStatus.textContent = "Autosaved to file at " + now.toLocaleTimeString();
+  } catch (err) {
+    console.error("Autosave to file failed", err);
+    fileSaveStatus.textContent = "File autosave failed; click 📝 to choose file again.";
+  }
+}
+
+function scheduleFileAutosave() {
+  if (!fileHandle) return;
+  clearTimeout(fileAutosaveTimer);
+  fileAutosaveTimer = setTimeout(() => {
+    saveStateToFile();
+  }, 1000);
+}
+
+fsSetupBtn.addEventListener("click", () => {
+  chooseAutosaveFile();
+});
+
+function saveState() {
+  if (!storageBroken) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      storageWarning.textContent = "";
+    } catch (err) {
+      console.warn("localStorage failed:", err);
+      storageBroken = true;
+      storageWarning.textContent = "Note: Browser storage is full or disabled. Use JSON download as backup.";
+    }
+  }
+  scheduleFileAutosave();
+}
+
+function applyTheme() {
+  const t = state.theme || defaultState.theme;
+  const root = document.documentElement;
+  root.style.setProperty("--body-bg-color", t.bodyBgColor || defaultState.theme.bodyBgColor);
+  root.style.setProperty("--body-bg-image", 'url("' + (t.bodyBgImage || defaultState.theme.bodyBgImage) + '")');
+  root.style.setProperty("--shell-bg-image", 'url("' + (t.shellBgImage || defaultState.theme.shellBgImage) + '")');
+  root.style.setProperty("--shell-radius", (t.shellRadius ?? defaultState.theme.shellRadius) + "px");
+  root.style.setProperty("--btn-bg", t.btnColor || defaultState.theme.btnColor);
+  root.style.setProperty("--btn-bg-hover", t.btnColor || defaultState.theme.btnColor);
+  root.style.setProperty("--btn-text", t.btnTextColor || defaultState.theme.btnTextColor);
+  root.style.setProperty("--text-main", t.textColor || defaultState.theme.textColor);
+  root.style.setProperty("--title-color", t.titleColor || defaultState.theme.titleColor);
+  root.style.setProperty("--header-line-color", t.headerLineColor || defaultState.theme.headerLineColor);
+  root.style.setProperty("--modal-bg", t.modalBgColor || defaultState.theme.modalBgColor);
+  root.style.setProperty("--scrollbar-color", t.scrollbarColor || defaultState.theme.scrollbarColor);
+  root.style.setProperty("--modal-header-bg", t.modalHeaderColor || defaultState.theme.modalHeaderColor);
+  root.style.setProperty("--glow-color", t.glowColor || defaultState.theme.glowColor);
+  root.style.setProperty("--calendar-bg", t.calendarBg || defaultState.theme.calendarBg);
+  root.style.setProperty("--calendar-header", t.calendarHeader || defaultState.theme.calendarHeader);
+  root.style.setProperty("--calendar-today", t.calendarToday || defaultState.theme.calendarToday);
+  root.style.setProperty("--calendar-day-outline", t.dayOutlineColor || defaultState.theme.dayOutlineColor);
+  
+  // Calendar shadow
+  const showShadow = t.calendarShadow !== false;
+  root.style.setProperty("--calendar-shadow", showShadow ? "0 2px 8px rgba(0,0,0,0.15)" : "none");
+
+  // Background tiling
+  if (t.bgTiled) {
+    document.body.classList.add("bg-tiled");
+  } else {
+    document.body.classList.remove("bg-tiled");
+  }
+
+  const scale = (typeof t.fontScale === "number" && !isNaN(t.fontScale)) ? t.fontScale : 1;
+  root.style.setProperty("--font-scale", scale);
+  
+  const menuScale = (typeof t.menuFontScale === "number" && !isNaN(t.menuFontScale)) ? t.menuFontScale : 1;
+  root.style.setProperty("--menu-font-scale", menuScale);
+  
+  if (menuFontSizeDisplay) {
+    menuFontSizeDisplay.textContent = Math.round(menuScale * 100) + "%";
+  }
+}
+
+/* ---------- SIDE MENU TOGGLE ---------- */
+sideMenuToggle.addEventListener("click", () => {
+  sideMenuToggle.classList.toggle("open");
+  sideMenuContainer.classList.toggle("open");
+});
+
+/* ---------- CALENDAR ---------- */
+function renderCalendar() {
+  const monthNames = ["January", "February", "March", "April", "May", "June",
+                      "July", "August", "September", "October", "November", "December"];
+  
+  calendarTitle.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+  calendarGrid.innerHTML = "";
+
+  // Day headers
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  dayNames.forEach(name => {
+    const header = document.createElement("div");
+    header.className = "calendar-day-header";
+    header.textContent = name;
+    calendarGrid.appendChild(header);
+  });
+
+  // Get first day of month
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === currentYear && today.getMonth() === currentMonth;
+  const todayDate = today.getDate();
+
+  // Previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = prevMonthDays - i;
+    const cell = createDayCell(day, currentYear, currentMonth - 1, true);
+    calendarGrid.appendChild(cell);
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cell = createDayCell(day, currentYear, currentMonth, false);
+    if (isCurrentMonth && day === todayDate) {
+      cell.classList.add("today");
+    }
+    calendarGrid.appendChild(cell);
+  }
+
+  // Only fill remaining cells in the current week
+  const totalCellsFilled = firstDay + daysInMonth;
+  const cellsInCurrentWeek = totalCellsFilled % 7;
+  if (cellsInCurrentWeek > 0) {
+    const remainingInWeek = 7 - cellsInCurrentWeek;
+    for (let day = 1; day <= remainingInWeek; day++) {
+      const cell = createDayCell(day, currentYear, currentMonth + 1, true);
+      calendarGrid.appendChild(cell);
+    }
+  }
+  
+  // Render decorations for current month
+  renderDecorations();
+}
+
+function createDayCell(day, year, month, otherMonth) {
+  const cell = document.createElement("div");
+  cell.className = "calendar-day";
+  if (otherMonth) cell.classList.add("other-month");
+
+  // Normalize month
+  let actualYear = year;
+  let actualMonth = month;
+  if (month < 0) {
+    actualMonth = 11;
+    actualYear = year - 1;
+  } else if (month > 11) {
+    actualMonth = 0;
+    actualYear = year + 1;
+  }
+
+  const dateStr = formatDate(actualYear, actualMonth, day);
+  cell.dataset.date = dateStr;
+
+  // Header row with day number and calories
+  const headerRow = document.createElement("div");
+  headerRow.className = "calendar-day-header-row";
+
+  const number = document.createElement("div");
+  number.className = "calendar-day-number";
+  number.textContent = day;
+  headerRow.appendChild(number);
+
+  // Calorie display - ALWAYS show "+" on hover to allow adding calories
+  const dayEntries = state.entries.filter(e => e.date === dateStr);
+  const calories = state.calories[dateStr] || 0;
+  
+  const calorieEl = document.createElement("div");
+  calorieEl.className = "calendar-calories";
+  
+  // Show calories if there are any, otherwise show "+" on hover
+  if (calories > 0) {
+    calorieEl.classList.add("has-calories");
+    calorieEl.textContent = `${calories}cal`;
+  } else {
+    // Always show "+" on hover for any day
+    calorieEl.textContent = "+";
+  }
+  
+  // Always allow clicking to open calorie modal
+  calorieEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openCalorieModal(dateStr);
+  });
+  headerRow.appendChild(calorieEl);
+
+  cell.appendChild(headerRow);
+
+  const entriesContainer = document.createElement("div");
+  entriesContainer.className = "calendar-day-entries";
+
+  // Get entries for this date
+  dayEntries.forEach(entry => {
+    const preview = document.createElement("div");
+    preview.className = "calendar-entry-preview";
+    if (entry.completed) {
+      preview.classList.add("completed");
+    }
+    preview.dataset.id = entry.id;
+    preview.draggable = true;
+
+    // Extract first image from body if exists
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = entry.bodyHtml || "";
+    const firstImg = tempDiv.querySelector("img");
+    
+    if (firstImg) {
+      const img = document.createElement("img");
+      img.src = firstImg.src;
+      preview.appendChild(img);
+    }
+
+    const title = entry.title || "Untitled";
+    const truncated = title.length > 12 ? title.substring(0, 12) + "..." : title;
+    const text = document.createTextNode(truncated);
+    preview.appendChild(text);
+
+    preview.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openEntryView(entry.id);
+    });
+
+    // Drag events
+    preview.addEventListener("dragstart", (e) => {
+      draggedEntryId = entry.id;
+      preview.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", entry.id);
+      
+      // Create custom drag ghost
+      dragGhost = document.createElement("div");
+      dragGhost.className = "drag-ghost";
+      dragGhost.textContent = title;
+      document.body.appendChild(dragGhost);
+      e.dataTransfer.setDragImage(dragGhost, 0, 0);
+    });
+
+    preview.addEventListener("dragend", () => {
+      preview.classList.remove("dragging");
+      draggedEntryId = null;
+      if (dragGhost) {
+        dragGhost.remove();
+        dragGhost = null;
+      }
+      clearDragHoverState();
+    });
+
+    entriesContainer.appendChild(preview);
+  });
+
+  cell.appendChild(entriesContainer);
+
+  // Drop events for day cells
+  cell.addEventListener("dragover", (e) => {
+    if (!draggedEntryId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    cell.classList.add("drag-over");
+  });
+
+  cell.addEventListener("dragleave", () => {
+    cell.classList.remove("drag-over");
+  });
+
+  cell.addEventListener("drop", (e) => {
+    e.preventDefault();
+    cell.classList.remove("drag-over");
+    if (!draggedEntryId) return;
+    
+    moveEntryToDate(draggedEntryId, dateStr);
+  });
+
+  cell.addEventListener("click", () => {
+    selectedDate = dateStr;
+    openEntryModal(null);
+  });
+
+  return cell;
+}
+
+function moveEntryToDate(entryId, newDate) {
+  const entry = state.entries.find(e => e.id === entryId);
+  if (entry && entry.date !== newDate) {
+    entry.date = newDate;
+    saveState();
+    renderCalendar();
+  }
+}
+
+function clearDragHoverState() {
+  if (dragHoverInterval) {
+    clearInterval(dragHoverInterval);
+    dragHoverInterval = null;
+  }
+  dragHoverStartTime = null;
+  currentHoverButton = null;
+  prevMonthBtn.classList.remove("drag-hover");
+  nextMonthBtn.classList.remove("drag-hover");
+}
+
+function startDragHoverTimer(button, direction) {
+  if (currentHoverButton === button) return;
+  
+  clearDragHoverState();
+  currentHoverButton = button;
+  button.classList.add("drag-hover");
+  dragHoverStartTime = Date.now();
+  
+  dragHoverInterval = setInterval(() => {
+    if (!draggedEntryId || currentHoverButton !== button) {
+      clearDragHoverState();
+      return;
+    }
+    
+    const elapsed = Date.now() - dragHoverStartTime;
+    if (elapsed >= 1000) {
+      clearDragHoverState();
+      
+      if (direction === "prev") {
+        currentMonth--;
+        if (currentMonth < 0) {
+          currentMonth = 11;
+          currentYear--;
+        }
+      } else {
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+      }
+      renderCalendar();
+    }
+  }, 100);
+}
+
+// Drag over month navigation buttons
+prevMonthBtn.addEventListener("dragover", (e) => {
+  if (!draggedEntryId) return;
+  e.preventDefault();
+  startDragHoverTimer(prevMonthBtn, "prev");
+});
+
+prevMonthBtn.addEventListener("dragleave", (e) => {
+  if (currentHoverButton === prevMonthBtn) {
+    clearDragHoverState();
+  }
+});
+
+nextMonthBtn.addEventListener("dragover", (e) => {
+  if (!draggedEntryId) return;
+  e.preventDefault();
+  startDragHoverTimer(nextMonthBtn, "next");
+});
+
+nextMonthBtn.addEventListener("dragleave", (e) => {
+  if (currentHoverButton === nextMonthBtn) {
+    clearDragHoverState();
+  }
+});
+
+function getEntriesForDate(dateStr) {
+  return state.entries.filter(e => e.date === dateStr);
+}
+
+prevMonthBtn.addEventListener("click", () => {
+  currentMonth--;
+  if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear--;
+  }
+  renderCalendar();
+});
+
+nextMonthBtn.addEventListener("click", () => {
+  currentMonth++;
+  if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear++;
+  }
+  renderCalendar();
+});
+
+todayBtn.addEventListener("click", () => {
+  const today = new Date();
+  currentYear = today.getFullYear();
+  currentMonth = today.getMonth();
+  renderCalendar();
+});
+
+/* ---------- CALORIE TRACKING ---------- */
+function openCalorieModal(dateStr) {
+  selectedCalorieDate = dateStr;
+  const calories = state.calories[dateStr] || 0;
+  
+  calorieTotal.textContent = `${calories} cal`;
+  
+  const dateObj = parseDate(dateStr);
+  const dateDisplay = new Date(dateObj.year, dateObj.month, dateObj.day).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+  calorieDate.textContent = dateDisplay;
+  
+  calorieAmountInput.value = "";
+  calorieSetInput.value = "";
+  
+  showModal(calorieModalBackdrop, calorieModal);
+}
+
+function closeCalorieModal() {
+  hideModal(calorieModalBackdrop, calorieModal);
+  selectedCalorieDate = null;
+}
+
+function updateCalories(amount) {
+  if (!selectedCalorieDate) return;
+  const current = state.calories[selectedCalorieDate] || 0;
+  const newTotal = Math.max(0, current + amount);
+  state.calories[selectedCalorieDate] = newTotal;
+  calorieTotal.textContent = `${newTotal} cal`;
+  saveState();
+  renderCalendar();
+}
+
+function setCalories(amount) {
+  if (!selectedCalorieDate) return;
+  const newTotal = Math.max(0, amount);
+  state.calories[selectedCalorieDate] = newTotal;
+  calorieTotal.textContent = `${newTotal} cal`;
+  saveState();
+  renderCalendar();
+}
+
+addCaloriesBtn.addEventListener("click", () => {
+  const amount = parseInt(calorieAmountInput.value) || 0;
+  if (amount > 0) {
+    updateCalories(amount);
+    calorieAmountInput.value = "";
+  }
+});
+
+subtractCaloriesBtn.addEventListener("click", () => {
+  const amount = parseInt(calorieAmountInput.value) || 0;
+  if (amount > 0) {
+    updateCalories(-amount);
+    calorieAmountInput.value = "";
+  }
+});
+
+setCaloriesBtn.addEventListener("click", () => {
+  const amount = parseInt(calorieSetInput.value) || 0;
+  setCalories(amount);
+  calorieSetInput.value = "";
+});
+
+resetCaloriesBtn.addEventListener("click", () => {
+  if (confirm("Reset calories to 0 for this day?")) {
+    setCalories(0);
+  }
+});
+
+// Quick add buttons
+calorieModal.addEventListener("click", (e) => {
+  const quickBtn = e.target.closest("[data-quick-cal]");
+  if (quickBtn) {
+    const amount = parseInt(quickBtn.dataset.quickCal) || 0;
+    updateCalories(amount);
+  }
+});
+
+// Allow Enter key in calorie inputs
+calorieAmountInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    const amount = parseInt(calorieAmountInput.value) || 0;
+    if (amount > 0) {
+      updateCalories(amount);
+      calorieAmountInput.value = "";
+    }
+  }
+});
+
+calorieSetInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    const amount = parseInt(calorieSetInput.value) || 0;
+    setCalories(amount);
+    calorieSetInput.value = "";
+  }
+});
+
+/* ---------- ENTRY MODAL ---------- */
+function openEntryModal(id) {
+  currentEditingId = id;
+  currentEditor = entryBodyEditor;
+
+  if (id) {
+    const entry = state.entries.find(e => e.id === id);
+    if (!entry) return;
+    entryModalTitle.textContent = "Edit entry";
+    entryTitleInput.value = entry.title || "";
+    entryBodyEditor.innerHTML = entry.bodyHtml || "";
+    deleteEntryBtn.classList.remove("hidden");
+    selectedDate = entry.date;
+  } else {
+    entryModalTitle.textContent = "New entry";
+    entryTitleInput.value = "";
+    entryBodyEditor.innerHTML = "";
+    deleteEntryBtn.classList.add("hidden");
+  }
+
+  entryHtmlModeToggle.checked = false;
+  entryHtmlTextarea.classList.add("hidden");
+  entryBodyEditor.classList.remove("hidden");
+  entryToolbar.style.display = "flex";
+  imageUrlInput.value = "";
+
+  showModal(entryModalBackdrop, entryModal);
+  entryTitleInput.focus();
+}
+
+function closeEntryModal() {
+  hideModal(entryModalBackdrop, entryModal);
+  currentEditingId = null;
+  currentEditor = null;
+}
+
+function saveEntry() {
+  const title = entryTitleInput.value.trim();
+  let bodyHtml = entryBodyEditor.innerHTML;
+
+  if (entryHtmlModeToggle.checked) {
+    bodyHtml = entryHtmlTextarea.value;
+  }
+
+  if (!title && !bodyHtml) return;
+
+  if (currentEditingId) {
+    const entry = state.entries.find(e => e.id === currentEditingId);
+    if (entry) {
+      entry.title = title;
+      entry.bodyHtml = bodyHtml;
+    }
+  } else {
+    state.entries.push({
+      id: generateId(),
+      date: selectedDate,
+      title,
+      bodyHtml,
+      completed: false
+    });
+  }
+
+  saveState();
+  renderCalendar();
+  closeEntryModal();
+}
+
+function deleteEntry() {
+  if (!currentEditingId) return;
+  if (!confirm("Delete this entry?")) return;
+  state.entries = state.entries.filter(e => e.id !== currentEditingId);
+  saveState();
+  renderCalendar();
+  closeEntryModal();
+}
+
+saveEntryBtn.addEventListener("click", saveEntry);
+deleteEntryBtn.addEventListener("click", deleteEntry);
+
+entryHtmlModeToggle.addEventListener("change", () => {
+  if (entryHtmlModeToggle.checked) {
+    entryHtmlTextarea.value = entryBodyEditor.innerHTML;
+    entryBodyEditor.classList.add("hidden");
+    entryHtmlTextarea.classList.remove("hidden");
+    entryToolbar.style.display = "none";
+  } else {
+    entryBodyEditor.innerHTML = entryHtmlTextarea.value;
+    entryHtmlTextarea.classList.add("hidden");
+    entryBodyEditor.classList.remove("hidden");
+    entryToolbar.style.display = "flex";
+  }
+});
+
+function insertImageIntoEditor(src, mode) {
+  if (!currentEditor) return;
+  const img = document.createElement("img");
+  img.src = src;
+  if (mode === "scaled") {
+    img.style.maxWidth = "300px";
+    img.style.height = "auto";
+  }
+
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && currentEditor.contains(sel.anchorNode)) {
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(img);
+    range.setStartAfter(img);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } else {
+    currentEditor.appendChild(img);
+  }
+}
+
+insertImageScaledBtn.addEventListener("click", () => {
+  const url = imageUrlInput.value.trim();
+  if (!url) return;
+  insertImageIntoEditor(url, "scaled");
+  imageUrlInput.value = "";
+});
+
+insertImageOriginalBtn.addEventListener("click", () => {
+  const url = imageUrlInput.value.trim();
+  if (!url) return;
+  insertImageIntoEditor(url, "original");
+  imageUrlInput.value = "";
+});
+
+entryDropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  entryDropZone.style.background = "#ffecd9";
+});
+
+entryDropZone.addEventListener("dragleave", () => {
+  entryDropZone.style.background = "";
+});
+
+entryDropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  entryDropZone.style.background = "";
+  const files = e.dataTransfer.files;
+  if (!files || !files.length) return;
+
+  Array.from(files).forEach(file => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      insertImageIntoEditor(ev.target.result, "scaled");
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+entryBodyEditor.addEventListener("click", (e) => {
+  if (e.target.tagName === "IMG") {
+    e.target.classList.toggle("emote-selected");
+  }
+});
+
+/* ---------- ENTRY VIEW MODAL ---------- */
+function openEntryView(id) {
+  const entry = state.entries.find(e => e.id === id);
+  if (!entry) return;
+
+  currentViewingEntryId = id;
+  entryViewTitle.textContent = entry.title || "Untitled";
+  
+  const dateObj = parseDate(entry.date);
+  const dateDisplay = new Date(dateObj.year, dateObj.month, dateObj.day).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+  entryViewDate.textContent = dateDisplay;
+  entryViewBody.innerHTML = entry.bodyHtml || "";
+
+  toggleCompleteBtn.textContent = entry.completed ? "mark incomplete" : "mark completed";
+
+  // Collect images for preview
+  currentPreviewImages = [];
+  const images = entryViewBody.querySelectorAll("img");
+  images.forEach(img => currentPreviewImages.push(img.src));
+
+  showModal(entryViewBackdrop, entryViewModal);
+}
+
+function closeEntryView() {
+  hideModal(entryViewBackdrop, entryViewModal);
+  currentViewingEntryId = null;
+}
+
+toggleCompleteBtn.addEventListener("click", () => {
+  if (!currentViewingEntryId) return;
+  const entry = state.entries.find(e => e.id === currentViewingEntryId);
+  if (entry) {
+    entry.completed = !entry.completed;
+    toggleCompleteBtn.textContent = entry.completed ? "mark incomplete" : "mark completed";
+    saveState();
+    renderCalendar();
+  }
+});
+
+editEntryFromViewBtn.addEventListener("click", () => {
+  if (!currentViewingEntryId) return;
+  closeEntryView();
+  openEntryModal(currentViewingEntryId);
+});
+
+entryViewBody.addEventListener("click", (e) => {
+  if (e.target.tagName === "IMG") {
+    const src = e.target.src;
+    currentPreviewIndex = currentPreviewImages.indexOf(src);
+    if (currentPreviewIndex < 0) currentPreviewIndex = 0;
+    imagePreviewImg.src = src;
+    showModal(imagePreviewBackdrop, imagePreviewModal);
+  }
+});
+
+/* ---------- TEXT EFFECTS ---------- */
+function applyTextEffect(effectName) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (!entryBodyEditor.contains(range.commonAncestorContainer)) return;
+
+  const className = `fx-${effectName}`;
+
+  // Check if already inside the effect
+  let node = range.commonAncestorContainer;
+  while (node && node !== entryBodyEditor) {
+    if (node.nodeType === 1 && node.classList && node.classList.contains(className)) {
+      // Remove effect
+      const parent = node.parentNode;
+      while (node.firstChild) {
+        parent.insertBefore(node.firstChild, node);
+      }
+      parent.removeChild(node);
+      return;
+    }
+    node = node.parentNode;
+  }
+
+  const span = document.createElement("span");
+  span.className = className;
+
+  try {
+    range.surroundContents(span);
+  } catch (err) {
+    const contents = range.extractContents();
+    span.appendChild(contents);
+    range.insertNode(span);
+  }
+
+  sel.removeAllRanges();
+  const newRange = document.createRange();
+  newRange.selectNodeContents(span);
+  sel.addRange(newRange);
+}
+
+function applyAlignment(direction) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (!entryBodyEditor.contains(range.commonAncestorContainer)) return;
+
+  let node = range.commonAncestorContainer;
+  while (node && node !== entryBodyEditor) {
+    if (node.nodeType === 1 && /^(DIV|P|LI|H[1-6])$/.test(node.tagName)) {
+      break;
+    }
+    node = node.parentNode;
+  }
+
+  if (!node || node === entryBodyEditor) {
+    node = document.createElement("div");
+    node.appendChild(range.extractContents());
+    range.insertNode(node);
+  }
+
+  node.style.textAlign = direction;
+}
+
+entryToolbar.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+
+  if (btn.dataset.cmd) {
+    document.execCommand(btn.dataset.cmd, false, null);
+  }
+  if (btn.dataset.align) {
+    applyAlignment(btn.dataset.align);
+  }
+  if (btn.dataset.effect) {
+    applyTextEffect(btn.dataset.effect);
+  }
+});
+
+/* ---------- EMOTE STICKER BOOK ---------- */
+function renderEmotePage() {
+  emoteGrid.innerHTML = "";
+  const totalPages = Math.ceil(state.emotes.length / EMOTES_PER_PAGE) || 1;
+  const start = emotePageIndex * EMOTES_PER_PAGE;
+  const end = start + EMOTES_PER_PAGE;
+  const pageEmotes = state.emotes.slice(start, end);
+
+  pageEmotes.forEach((src, i) => {
+    const tile = document.createElement("div");
+    tile.className = "emote-tile";
+    tile.dataset.index = start + i;
+
+    const img = document.createElement("img");
+    img.src = src;
+    tile.appendChild(img);
+
+    const del = document.createElement("div");
+    del.className = "emote-delete";
+    del.textContent = "✕";
+    tile.appendChild(del);
+
+    emoteGrid.appendChild(tile);
+  });
+
+  emotePageInfo.textContent = `page ${emotePageIndex + 1}/${totalPages}`;
+}
+
+function openEmoteModal() {
+  emotePageIndex = 0;
+  renderEmotePage();
+  showModal(emoteModalBackdrop, emoteModal);
+}
+
+function closeEmoteModal() {
+  hideModal(emoteModalBackdrop, emoteModal);
+}
+
+emoteGrid.addEventListener("click", (e) => {
+  const del = e.target.closest(".emote-delete");
+  if (del) {
+    const tile = del.closest(".emote-tile");
+    if (!tile) return;
+    const idx = parseInt(tile.dataset.index, 10);
+    if (!isNaN(idx) && idx >= 0 && idx < state.emotes.length) {
+      state.emotes.splice(idx, 1);
+      saveState();
+      renderEmotePage();
+    }
+    return;
+  }
+
+  const tile = e.target.closest(".emote-tile");
+  if (tile && currentEditor) {
+    const img = tile.querySelector("img");
+    if (img && img.src) {
+      insertImageIntoEditor(img.src, "scaled");
+    }
+  }
+});
+
+emotePrevBtn.addEventListener("click", () => {
+  if (emotePageIndex > 0) {
+    emotePageIndex--;
+    renderEmotePage();
+  }
+});
+
+emoteNextBtn.addEventListener("click", () => {
+  const totalPages = Math.ceil(state.emotes.length / EMOTES_PER_PAGE) || 1;
+  if (emotePageIndex < totalPages - 1) {
+    emotePageIndex++;
+    renderEmotePage();
+  }
+});
+
+saveSelectedAsEmotesBtn.addEventListener("click", () => {
+  const selectedImgs = entryBodyEditor.querySelectorAll("img.emote-selected");
+  if (selectedImgs.length === 0) {
+    alert("No images selected. Click on images in the text area to highlight them first.");
+    return;
+  }
+  selectedImgs.forEach(img => {
+    if (img.src && !state.emotes.includes(img.src)) {
+      state.emotes.push(img.src);
+    }
+    img.classList.remove("emote-selected");
+  });
+  saveState();
+  alert(`Saved ${selectedImgs.length} emote(s) to your sticker book!`);
+});
+
+openEmoteBookFromEntryBtn.addEventListener("click", openEmoteModal);
+openEmoteBookGlobal.addEventListener("click", openEmoteModal);
+
+/* ---------- IMAGE PREVIEW ---------- */
+function updateImagePreview() {
+  if (currentPreviewImages.length === 0) return;
+  imagePreviewImg.src = currentPreviewImages[currentPreviewIndex];
+}
+
+function closeImagePreview() {
+  hideModal(imagePreviewBackdrop, imagePreviewModal);
+}
+
+imagePrevBtn.addEventListener("click", () => {
+  if (currentPreviewIndex > 0) {
+    currentPreviewIndex--;
+    updateImagePreview();
+  }
+});
+
+imageNextBtn.addEventListener("click", () => {
+  if (currentPreviewIndex < currentPreviewImages.length - 1) {
+    currentPreviewIndex++;
+    updateImagePreview();
+  }
+});
+
+/* ---------- THEME CUSTOMIZER ---------- */
+function updateThemePresetDropdown() {
+  themePresetSelect.innerHTML = '<option value="">-- Select a saved theme --</option>';
+  const presets = state.themePresets || {};
+  Object.keys(presets).sort().forEach(name => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    themePresetSelect.appendChild(option);
+  });
+}
+
+function openThemeModal() {
+  const t = state.theme || defaultState.theme;
+  bodyBgColorInput.value = t.bodyBgColor || defaultState.theme.bodyBgColor;
+  bodyBgImageInput.value = t.bodyBgImage || defaultState.theme.bodyBgImage;
+  bgTiledToggle.checked = t.bgTiled || false;
+  shellBgImageInput.value = t.shellBgImage || defaultState.theme.shellBgImage;
+  shellRadiusInput.value = t.shellRadius ?? defaultState.theme.shellRadius;
+  btnColorInput.value = t.btnColor || defaultState.theme.btnColor;
+  btnTextColorInput.value = t.btnTextColor || defaultState.theme.btnTextColor;
+  textColorInput.value = t.textColor || defaultState.theme.textColor;
+  titleColorInput.value = t.titleColor || defaultState.theme.titleColor;
+  headerLineColorInput.value = t.headerLineColor || defaultState.theme.headerLineColor;
+  calendarBgInput.value = t.calendarBg || defaultState.theme.calendarBg;
+  calendarHeaderInput.value = t.calendarHeader || defaultState.theme.calendarHeader;
+  calendarTodayInput.value = t.calendarToday || defaultState.theme.calendarToday;
+  dayOutlineColorInput.value = t.dayOutlineColor || defaultState.theme.dayOutlineColor;
+  calendarShadowToggle.checked = t.calendarShadow !== false;
+  glowColorInput.value = t.glowColor || defaultState.theme.glowColor;
+  modalBgColorInput.value = t.modalBgColor || defaultState.theme.modalBgColor;
+  modalHeaderColorInput.value = t.modalHeaderColor || defaultState.theme.modalHeaderColor;
+  scrollbarColorInput.value = t.scrollbarColor || defaultState.theme.scrollbarColor;
+  youtubeUrlInput.value = t.youtubeUrl || "";
+  
+  const menuScale = t.menuFontScale || 1;
+  menuFontSizeDisplay.textContent = Math.round(menuScale * 100) + "%";
+
+  updateThemePresetDropdown();
+  themePresetNameInput.value = "";
+  themePresetSelect.value = "";
+
+  showModal(themeModalBackdrop, themeModal);
+}
+
+function closeThemeModal() {
+  hideModal(themeModalBackdrop, themeModal);
+}
+
+function getCurrentThemeFromInputs() {
+  return {
+    bodyBgColor: bodyBgColorInput.value,
+    bodyBgImage: bodyBgImageInput.value,
+    bgTiled: bgTiledToggle.checked,
+    shellBgImage: shellBgImageInput.value,
+    shellRadius: parseInt(shellRadiusInput.value, 10) || 22,
+    btnColor: btnColorInput.value,
+    btnTextColor: btnTextColorInput.value,
+    textColor: textColorInput.value,
+    titleColor: titleColorInput.value,
+    headerLineColor: headerLineColorInput.value,
+    calendarBg: calendarBgInput.value,
+    calendarHeader: calendarHeaderInput.value,
+    calendarToday: calendarTodayInput.value,
+    dayOutlineColor: dayOutlineColorInput.value,
+    calendarShadow: calendarShadowToggle.checked,
+    glowColor: glowColorInput.value,
+    modalBgColor: modalBgColorInput.value,
+    modalHeaderColor: modalHeaderColorInput.value,
+    scrollbarColor: scrollbarColorInput.value,
+    youtubeUrl: youtubeUrlInput.value.trim(),
+    fontScale: state.theme.fontScale || 1,
+    menuFontScale: state.theme.menuFontScale || 1
+  };
+}
+
+function saveTheme() {
+  const newTheme = getCurrentThemeFromInputs();
+  const oldYoutubeUrl = state.theme.youtubeUrl || "";
+  
+  Object.assign(state.theme, newTheme);
+
+  saveState();
+  applyTheme();
+  
+  // If YouTube URL changed, reload iframe
+  if (newTheme.youtubeUrl !== oldYoutubeUrl) {
+    updateYouTubeEmbed();
+  }
+}
+
+// Theme preset handlers
+saveThemePresetBtn.addEventListener("click", () => {
+  const name = themePresetNameInput.value.trim();
+  if (!name) {
+    alert("Please enter a name for the theme preset.");
+    return;
+  }
+  
+  if (!state.themePresets) {
+    state.themePresets = {};
+  }
+  
+  state.themePresets[name] = getCurrentThemeFromInputs();
+  saveState();
+  updateThemePresetDropdown();
+  themePresetSelect.value = name;
+  themePresetNameInput.value = "";
+  alert(`Theme "${name}" saved!`);
+});
+
+loadThemePresetBtn.addEventListener("click", () => {
+  const name = themePresetSelect.value;
+  if (!name || !state.themePresets || !state.themePresets[name]) {
+    alert("Please select a theme to load.");
+    return;
+  }
+  
+  const preset = state.themePresets[name];
+  
+  // Populate inputs with preset values
+  bodyBgColorInput.value = preset.bodyBgColor || defaultState.theme.bodyBgColor;
+  bodyBgImageInput.value = preset.bodyBgImage || defaultState.theme.bodyBgImage;
+  bgTiledToggle.checked = preset.bgTiled || false;
+  shellBgImageInput.value = preset.shellBgImage || defaultState.theme.shellBgImage;
+  shellRadiusInput.value = preset.shellRadius ?? defaultState.theme.shellRadius;
+  btnColorInput.value = preset.btnColor || defaultState.theme.btnColor;
+  btnTextColorInput.value = preset.btnTextColor || defaultState.theme.btnTextColor;
+  textColorInput.value = preset.textColor || defaultState.theme.textColor;
+  titleColorInput.value = preset.titleColor || defaultState.theme.titleColor;
+  headerLineColorInput.value = preset.headerLineColor || defaultState.theme.headerLineColor;
+  calendarBgInput.value = preset.calendarBg || defaultState.theme.calendarBg;
+  calendarHeaderInput.value = preset.calendarHeader || defaultState.theme.calendarHeader;
+  calendarTodayInput.value = preset.calendarToday || defaultState.theme.calendarToday;
+  dayOutlineColorInput.value = preset.dayOutlineColor || defaultState.theme.dayOutlineColor;
+  calendarShadowToggle.checked = preset.calendarShadow !== false;
+  glowColorInput.value = preset.glowColor || defaultState.theme.glowColor;
+  modalBgColorInput.value = preset.modalBgColor || defaultState.theme.modalBgColor;
+  modalHeaderColorInput.value = preset.modalHeaderColor || defaultState.theme.modalHeaderColor;
+  scrollbarColorInput.value = preset.scrollbarColor || defaultState.theme.scrollbarColor;
+  youtubeUrlInput.value = preset.youtubeUrl || "";
+});
+
+deleteThemePresetBtn.addEventListener("click", () => {
+  const name = themePresetSelect.value;
+  if (!name || !state.themePresets || !state.themePresets[name]) {
+    alert("Please select a theme to delete.");
+    return;
+  }
+  
+  if (!confirm(`Delete theme "${name}"?`)) return;
+  
+  delete state.themePresets[name];
+  saveState();
+  updateThemePresetDropdown();
+  themePresetSelect.value = "";
+});
+
+themeButton.addEventListener("click", openThemeModal);
+saveThemeBtn.addEventListener("click", () => {
+  saveTheme();
+  closeThemeModal();
+});
+
+fontSizeMinusBtn.addEventListener("click", () => {
+  let scale = state.theme.fontScale || 1;
+  scale = Math.max(0.6, scale - 0.1);
+  state.theme.fontScale = scale;
+  saveState();
+  applyTheme();
+});
+
+fontSizePlusBtn.addEventListener("click", () => {
+  let scale = state.theme.fontScale || 1;
+  scale = Math.min(1.6, scale + 0.1);
+  state.theme.fontScale = scale;
+  saveState();
+  applyTheme();
+});
+
+menuFontSizeMinusBtn.addEventListener("click", () => {
+  let scale = state.theme.menuFontScale || 1;
+  scale = Math.max(0.7, scale - 0.1);
+  state.theme.menuFontScale = scale;
+  saveState();
+  applyTheme();
+});
+
+menuFontSizePlusBtn.addEventListener("click", () => {
+  let scale = state.theme.menuFontScale || 1;
+  scale = Math.min(1.8, scale + 0.1);
+  state.theme.menuFontScale = scale;
+  saveState();
+  applyTheme();
+});
+
+/* ---------- MODAL HELPERS ---------- */
+function showModal(backdrop, modal) {
+  backdrop.classList.add("visible");
+  requestAnimationFrame(() => {
+    modal.classList.add("open");
+  });
+}
+
+function hideModal(backdrop, modal) {
+  if (modal) {
+    modal.classList.add("closing");
+    modal.classList.remove("open");
+    setTimeout(() => {
+      backdrop.classList.remove("visible");
+      modal.classList.remove("closing");
+    }, 180);
+  } else {
+    backdrop.classList.remove("visible");
+  }
+}
+
+function makeModalDraggable(modal, backdrop) {
+  const header = modal.querySelector(".modal-header");
+  if (!header) return;
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  header.addEventListener("mousedown", (e) => {
+    if (!backdrop.classList.contains("visible")) return;
+    dragging = true;
+    const rect = modal.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    
+    modal.classList.add("dragging");
+    modal.style.left = rect.left + "px";
+    modal.style.top = rect.top + "px";
+    modal.style.transform = "translate(0, 0)";
+    document.body.classList.add("no-select");
+    e.preventDefault();
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging || !backdrop.classList.contains("visible")) return;
+    let newLeft = e.clientX - offsetX;
+    let newTop = e.clientY - offsetY;
+    const rect = modal.getBoundingClientRect();
+    const padding = 20;
+    const maxLeft = window.innerWidth - rect.width + padding;
+    const maxTop = window.innerHeight - rect.height + padding;
+    if (newLeft < -rect.width + padding) newLeft = -rect.width + padding;
+    if (newTop < -rect.height + padding) newTop = -rect.height + padding;
+    if (newLeft > maxLeft) newLeft = maxLeft;
+    if (newTop > maxTop) newTop = maxTop;
+    modal.style.left = newLeft + "px";
+    modal.style.top = newTop + "px";
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (dragging) {
+      dragging = false;
+      modal.classList.remove("dragging");
+      document.body.classList.remove("no-select");
+    }
+  });
+}
+
+makeModalDraggable(entryModal, entryModalBackdrop);
+makeModalDraggable(entryViewModal, entryViewBackdrop);
+makeModalDraggable(themeModal, themeModalBackdrop);
+makeModalDraggable(emoteModal, emoteModalBackdrop);
+makeModalDraggable(imagePreviewModal, imagePreviewBackdrop);
+makeModalDraggable(calorieModal, calorieModalBackdrop);
+
+document.addEventListener("click", (e) => {
+  if (e.target.matches("[data-close-entry]")) {
+    closeEntryModal();
+  } else if (e.target.matches("[data-close-view]")) {
+    closeEntryView();
+  } else if (e.target.matches("[data-close-theme]")) {
+    closeThemeModal();
+  } else if (e.target.matches("[data-close-emote]")) {
+    closeEmoteModal();
+  } else if (e.target.matches("[data-close-image]")) {
+    closeImagePreview();
+  } else if (e.target.matches("[data-close-calorie]")) {
+    closeCalorieModal();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (entryModalBackdrop.classList.contains("visible")) closeEntryModal();
+    else if (entryViewBackdrop.classList.contains("visible")) closeEntryView();
+    else if (themeModalBackdrop.classList.contains("visible")) closeThemeModal();
+    else if (emoteModalBackdrop.classList.contains("visible")) closeEmoteModal();
+    else if (imagePreviewBackdrop.classList.contains("visible")) closeImagePreview();
+    else if (calorieModalBackdrop.classList.contains("visible")) closeCalorieModal();
+  }
+});
+
+/* ---------- DECORATIONS (Per-Month) ---------- */
+let stickerDragState = {
+  id: null,
+  mode: null,
+  offsetX: 0,
+  offsetY: 0,
+  startWidth: 0,
+  startHeight: 0,
+  startMouseX: 0,
+  startMouseY: 0,
+  startRotation: 0,
+  centerX: 0,
+  centerY: 0
+};
+
+function getCurrentMonthDecorations() {
+  const key = getMonthKey(currentYear, currentMonth);
+  if (!state.monthDecorations[key]) {
+    state.monthDecorations[key] = [];
+  }
+  return state.monthDecorations[key];
+}
+
+function renderDecorations() {
+  decorLayer.innerHTML = "";
+  const list = getCurrentMonthDecorations();
+  
+  list.forEach(dec => {
+    const sticker = document.createElement("div");
+    sticker.className = "sticker";
+    sticker.dataset.id = dec.id;
+    sticker.style.left = dec.x + "px";
+    sticker.style.top = dec.y + "px";
+    sticker.style.width = (dec.width || 180) + "px";
+    sticker.style.height = (dec.height || 180) + "px";
+    if (dec.rotation) {
+      sticker.style.transform = `rotate(${dec.rotation}deg)`;
+    }
+
+    const img = document.createElement("img");
+    img.src = dec.src;
+    sticker.appendChild(img);
+
+    const handle = document.createElement("div");
+    handle.className = "sticker-handle";
+    sticker.appendChild(handle);
+
+    const rotateHandle = document.createElement("div");
+    rotateHandle.className = "sticker-rotate";
+    rotateHandle.textContent = "↻";
+    sticker.appendChild(rotateHandle);
+
+    const del = document.createElement("div");
+    del.className = "sticker-delete";
+    del.textContent = "✕";
+    sticker.appendChild(del);
+
+    decorLayer.appendChild(sticker);
+  });
+}
+
+decorModeButton.addEventListener("click", () => {
+  document.body.classList.toggle("decor-mode");
+});
+
+decorLayer.addEventListener("mousedown", (e) => {
+  if (!document.body.classList.contains("decor-mode")) return;
+
+  const del = e.target.closest(".sticker-delete");
+  if (del) {
+    const sticker = del.closest(".sticker");
+    if (sticker) {
+      const id = sticker.dataset.id;
+      const list = getCurrentMonthDecorations();
+      const idx = list.findIndex(d => d.id === id);
+      if (idx >= 0) list.splice(idx, 1);
+      saveState();
+      renderDecorations();
+    }
+    e.preventDefault();
+    return;
+  }
+
+  const handle = e.target.closest(".sticker-handle");
+  const rotateHandle = e.target.closest(".sticker-rotate");
+  const sticker = e.target.closest(".sticker");
+  if (!sticker) return;
+  const id = sticker.dataset.id;
+
+  if (handle) {
+    stickerDragState.mode = "resize";
+    stickerDragState.id = id;
+    stickerDragState.startMouseX = e.clientX;
+    stickerDragState.startMouseY = e.clientY;
+    stickerDragState.startWidth = sticker.offsetWidth;
+    stickerDragState.startHeight = sticker.offsetHeight;
+  } else if (rotateHandle) {
+    stickerDragState.mode = "rotate";
+    stickerDragState.id = id;
+    const rect = sticker.getBoundingClientRect();
+    stickerDragState.centerX = rect.left + rect.width / 2;
+    stickerDragState.centerY = rect.top + rect.height / 2;
+    const dec = getCurrentMonthDecorations().find(d => d.id === id);
+    stickerDragState.startRotation = dec ? (dec.rotation || 0) : 0;
+    stickerDragState.startMouseX = e.clientX;
+    stickerDragState.startMouseY = e.clientY;
+  } else {
+    stickerDragState.mode = "move";
+    stickerDragState.id = id;
+    const rect = sticker.getBoundingClientRect();
+    stickerDragState.offsetX = e.clientX - rect.left;
+    stickerDragState.offsetY = e.clientY - rect.top;
+  }
+
+  e.preventDefault();
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!document.body.classList.contains("decor-mode")) return;
+  if (!stickerDragState.mode || !stickerDragState.id) return;
+
+  const list = getCurrentMonthDecorations();
+  const dec = list.find(d => d.id === stickerDragState.id);
+  if (!dec) return;
+  const sticker = decorLayer.querySelector('.sticker[data-id="' + stickerDragState.id + '"]');
+  if (!sticker) return;
+
+  if (stickerDragState.mode === "move") {
+    const x = e.clientX - stickerDragState.offsetX;
+    const y = e.clientY - stickerDragState.offsetY;
+    sticker.style.left = x + "px";
+    sticker.style.top = y + "px";
+    dec.x = x;
+    dec.y = y;
+  } else if (stickerDragState.mode === "resize") {
+    const dx = e.clientX - stickerDragState.startMouseX;
+    const dy = e.clientY - stickerDragState.startMouseY;
+    const newW = Math.max(40, stickerDragState.startWidth + dx);
+    const newH = Math.max(40, stickerDragState.startHeight + dy);
+    sticker.style.width = newW + "px";
+    sticker.style.height = newH + "px";
+    dec.width = newW;
+    dec.height = newH;
+  } else if (stickerDragState.mode === "rotate") {
+    const startAngle = Math.atan2(
+      stickerDragState.startMouseY - stickerDragState.centerY,
+      stickerDragState.startMouseX - stickerDragState.centerX
+    );
+    const currentAngle = Math.atan2(
+      e.clientY - stickerDragState.centerY,
+      e.clientX - stickerDragState.centerX
+    );
+    const angleDiff = (currentAngle - startAngle) * (180 / Math.PI);
+    const newRotation = stickerDragState.startRotation + angleDiff;
+    sticker.style.transform = `rotate(${newRotation}deg)`;
+    dec.rotation = newRotation;
+  }
+});
+
+window.addEventListener("mouseup", () => {
+  if (stickerDragState.mode) {
+    stickerDragState.mode = null;
+    stickerDragState.id = null;
+    saveState();
+  }
+});
+
+window.addEventListener("dragover", (e) => {
+  if (!document.body.classList.contains("decor-mode")) return;
+  e.preventDefault();
+});
+
+window.addEventListener("drop", (e) => {
+  if (!document.body.classList.contains("decor-mode")) return;
+  e.preventDefault();
+  const files = e.dataTransfer.files;
+  if (!files || !files.length) return;
+
+  Array.from(files).forEach(file => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const src = ev.target.result;
+      const id = "sticker-" + generateId();
+      const x = e.clientX;
+      const y = e.clientY;
+      const list = getCurrentMonthDecorations();
+      list.push({
+        id,
+        src,
+        x,
+        y,
+        width: 180,
+        height: 180,
+        rotation: 0
+      });
+      saveState();
+      renderDecorations();
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+/* ---------- YOUTUBE EMBED ---------- */
+function updateYouTubeEmbed() {
+  const youtubeUrl = state?.theme?.youtubeUrl || "";
+  const videoId = extractYouTubeId(youtubeUrl);
+  
+  if (!videoId) {
+    youtubeEmbedContainer.innerHTML = "";
+    return;
+  }
+  
+  // Create simple iframe embed with controls
+  youtubeEmbedContainer.innerHTML = `<iframe 
+    src="https://www.youtube.com/embed/${videoId}?loop=1&playlist=${videoId}" 
+    allow="autoplay; encrypted-media" 
+    allowfullscreen></iframe>`;
+}
+
+/* ---------- JSON BACKUP ---------- */
+downloadJsonBtn.addEventListener("click", () => {
+  try {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    a.href = url;
+    a.download = `calendar-backup-${y}-${m}-${day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("JSON download failed:", err);
+    alert("Could not create JSON file in this browser.");
+  }
+});
+
+importJsonBtn.addEventListener("click", () => {
+  importJsonInput.value = "";
+  importJsonInput.click();
+});
+
+importJsonInput.addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!confirm("Importing will replace current data. Continue?")) {
+        return;
+      }
+      
+      state = structuredClone(defaultState);
+      if (data.entries && Array.isArray(data.entries)) {
+        state.entries = data.entries;
+      }
+      if (data.calories && typeof data.calories === "object") {
+        state.calories = data.calories;
+      }
+      if (data.theme && typeof data.theme === "object") {
+        Object.assign(state.theme, data.theme);
+      }
+      if (data.decorations && Array.isArray(data.decorations)) {
+        state.decorations = data.decorations;
+      }
+      if (data.monthDecorations && typeof data.monthDecorations === "object") {
+        state.monthDecorations = data.monthDecorations;
+      }
+      if (data.emotes && Array.isArray(data.emotes)) {
+        state.emotes = data.emotes;
+      }
+      if (data.themePresets && typeof data.themePresets === "object") {
+        state.themePresets = data.themePresets;
+      }
+      
+      saveState();
+      applyTheme();
+      renderCalendar();
+      renderDecorations();
+      updateYouTubeEmbed();
+      alert("Backup imported successfully.");
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert("Could not read that JSON file.");
+    }
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- INIT ---------- */
+(function init() {
+  state = loadState();
+  applyTheme();
+  renderCalendar();
+  renderDecorations();
+  updateYouTubeEmbed();
+})();
+</script>
+</body>
+</html>
